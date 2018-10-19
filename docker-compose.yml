@@ -1,0 +1,42 @@
+version: '3'
+services:
+
+ # Service for the redis queue
+  redis:
+    image: redis
+    expose:
+      - "6379"
+
+# DB for PHYLOViZ Online.
+  db_phyloviz:
+    build: ./components/Postgres
+    restart: always
+    environment:
+      POSTGRES_USER: "phyloviz"
+      POSTGRES_PASSWORD: "phyloviz"
+      POSTGRES_DB: "phyloviz"
+    volumes:
+      - ./configs/dbs/init.sql:/docker-entrypoint-initdb.d/1-schema.sql
+
+  # Service for PHYLOViZ Online application
+  phyloviz:
+    build: ./components/PHYLOViZ
+    restart: on-failure
+    volumes:
+      - ./configs/app/phyloviz_config.js:/PHYLOVIZ/Online-PhyloViZ/config.js
+    expose:
+      - "80"
+    depends_on:
+      - "db_phyloviz"
+      - "redis"
+    command: ["init_all"]
+
+  # Service for the nginx web server. it requires mapping of the nginx conf
+  # to be able to access all the other processes from the browser.
+  web:
+    image: nginx:latest
+    restart: on-failure
+    volumes:
+      - ./configs/nginx/site.conf:/etc/nginx/conf.d/default.conf
+    ports:
+      - "80:80"
